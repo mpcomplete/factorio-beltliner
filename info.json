@@ -1,7 +1,7 @@
 {
-	"name": "Quickbelt",
+	"name": "QuickBelt",
 	"version": "1.0.0",
-	"title": "Quickbelt",
+	"title": "QuickBelt",
 	"author": "mpcomplete",
 	"description": "Place multiple lanes of belts with a single click. Handles rotations and corners, and avoids obstacles with undergrounds.",
 	"factorio_version": "0.18"

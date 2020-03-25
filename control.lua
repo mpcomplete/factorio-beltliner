@@ -148,6 +148,7 @@ function placeBelts(player, belts, dir)
   end
 end
 
+-- p.surface.create_entity{name="orange-arrow-with-circle", position={x,y}, direction=defines.direction.north, force=p.force, player=p}
 -- Place a single belt at the position, or a ghost if we're all out.
 function placeBelt(player, beltProto, pos, dir, optType)
   if player.can_place_entity{name = beltProto.name, position = pos, direction = dir} and
@@ -252,3 +253,18 @@ script.on_event(defines.events.on_built_entity, function(event)
   Global.get(player).lastBelt = { proto = proto, pos = pos }
 end,
 {{filter = "transport-belt-connectable"}, {filter = "ghost"}})
+
+script.on_event(defines.events.on_player_cursor_stack_changed, function(event)
+  local player = game.players[event.player_index]
+  debug(player, "cursor stack changed")
+  if player.cursor_stack.valid and player.cursor_stack.valid_for_read and player.cursor_stack.name == "transport_belt" then
+    -- place entities centered at player pos
+    debug(player, "holding belt")
+  end
+end)
+
+script.on_event(defines.events.on_selected_entity_changed, function(event)
+  -- if placing_belt
+  --   move entities centered at entity pos
+  --   show belt path
+end)
