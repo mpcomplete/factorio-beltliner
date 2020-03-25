@@ -18,4 +18,8 @@ function Pos.proj(pos, dir)
   return Dir.abs[dir] == Dir.E and math.abs(pos.x) or math.abs(pos.y)
 end
 
+function Pos.eq(a, b)
+  return a.x == b.x and a.y == b.y
+end
+
 return Pos

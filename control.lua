@@ -206,21 +206,26 @@ function getUndergroundForBelt(beltProto)
 end
 
 function centerDetectorsAt(player, pos)
-  local radius = 100
+  local radius = 10
+  local _, pdata = Player.get(player.index)
 
   destroyDetectors(player)
 
   for x = -radius, radius do
     for y = -radius, radius do
-      player.surface.create_entity{
+      local entity = player.surface.create_entity{
         name="quickbelt-cursor-detector",
         position=Pos.add(pos, {x=x, y=y}),
         direction=Dir.N,
         force=player.force,
         player=player
       }
+      if x == 0 and y == 0 then
+        pdata.centerDetector = entity
+      end
     end
   end
+
 end
 
 function destroyDetectors(player)
@@ -305,28 +310,34 @@ script.on_event(defines.events.on_built_entity, function(event)
     return
   end
 
-  -- player.surface.set_tiles({{name="concrete", position=pos}});
-
   pdata.lastBelt = { proto = proto, pos = pos }
 end,
 {{filter = "transport-belt-connectable"}, {filter = "ghost"}})
 
 script.on_event(defines.events.on_player_cursor_stack_changed, function(event)
-  local player = Player.get(event.player_index)
-  if player.cursor_stack.valid and player.cursor_stack.valid_for_read and player.cursor_stack.name == "transport-belt" then
-    centerDetectorsAt(player, player.position)
-  else
-    destroyDetectors(player)
+  local player, pdata = Player.get(event.player_index)
+
+  pdata.isPlacing = false
+  if pdata.lastBelt and player.cursor_stack.valid and player.cursor_stack.valid_for_read then
+    local cursorEntity = player.cursor_stack.prototype.place_result
+    if cursorEntity and cursorEntity.belt_speed then
+      pdata.isPlacing = true
+      centerDetectorsAt(player, player.position)
+      return
+    end
+
+    -- Not a belt, end placement mode.
+    pdata.lastBelt = nil
   end
+
+  destroyDetectors(player)
 end)
 
 script.on_event(defines.events.on_selected_entity_changed, function(event)
   local player, pdata = Player.get(event.player_index)
-  if player.selected then
+  if pdata.isPlacing and player.selected and player.selected ~= pdata.centerDetector then
     local destPos = player.selected.bounding_box.left_top
     drawPath(player, destPos)
+    centerDetectorsAt(player, destPos)
   end
-  -- if placing_belt
-  --   move entities centered at entity pos
-  --   show belt path to pos
 end)

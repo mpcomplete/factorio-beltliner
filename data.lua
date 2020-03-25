@@ -22,6 +22,8 @@ data:extend({
   {
     type = "simple-entity",
     name = "quickbelt-cursor-detector",
+    collision_box = nil,
+    collision_mask = {},
     selection_box = {{0, 0}, {1.0, 1.0}},
     order = "zzz-invis-entity",
     picture =
