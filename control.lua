@@ -1,4 +1,4 @@
-local Global = require("global")
+local Player = require("player")
 local Dir = require("dir")
 local Pos = require("pos")
 
@@ -212,10 +212,10 @@ script.on_event(defines.events.on_built_entity, function(event)
   -- Ignore non-item placements (e.g. a blueprint, undo, etc).
   if not event.item then return end
 
-  local player = game.players[event.player_index]
+  local player, pdata = Player.get(event.player_index)
   local pos = event.created_entity.bounding_box.left_top
   local proto = event.created_entity.prototype
-  local lastBelt = Global.get(player).lastBelt
+  local lastBelt = pdata.lastBelt
 
   if event.created_entity.name == "entity-ghost" then
     proto = event.created_entity.ghost_prototype
@@ -250,7 +250,7 @@ script.on_event(defines.events.on_built_entity, function(event)
 
   -- player.surface.set_tiles({{name="concrete", position=pos}});
 
-  Global.get(player).lastBelt = { proto = proto, pos = pos }
+  pdata.lastBelt = { proto = proto, pos = pos }
 end,
 {{filter = "transport-belt-connectable"}, {filter = "ghost"}})
 
