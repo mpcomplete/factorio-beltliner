@@ -266,5 +266,5 @@ end)
 script.on_event(defines.events.on_selected_entity_changed, function(event)
   -- if placing_belt
   --   move entities centered at entity pos
-  --   show belt path
+  --   show belt path to pos
 end)
