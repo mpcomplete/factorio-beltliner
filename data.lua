@@ -21,17 +21,15 @@ data:extend(belt_sprite_prototypes)
 data:extend({
   {
     type = "simple-entity",
-    name = "belt-invis-entity",
-    -- selection_box = {{-0.5, -0.5}, {0.5, 0.5}},
+    name = "quickbelt-cursor-detector",
     selection_box = {{0, 0}, {1.0, 1.0}},
     order = "zzz-invis-entity",
-    -- flags = {"placeable-neutral", "player-creation"},
     picture =
     {
-      filename = "__base__/graphics/entity/wooden-chest/wooden-chest.png",
+      filename = "__QuickBelt__/assets/transparent.png",
       priority = "extra-high",
-      width = 32,
-      height = 36,
+      width = 42,
+      height = 42,
       shift = {.5, .5},
     },
   },
