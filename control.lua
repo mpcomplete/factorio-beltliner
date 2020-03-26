@@ -50,14 +50,14 @@ function findParallelLanes(player, beltProto, entity)
 end
 
 -- Plan the start position for each lane of belts, potentially handling a corner.
-function planLanes(player, leftTop, numLanes, startDir, targetDir)
-  local lanes = {}
+function planLaneStarts(player, leftTop, numLanes, startDir, targetDir)
+  local laneStarts = {}
 
   if Dir.isParallel(startDir, targetDir) then
     local perpendicularOffset = Dir.toOffset[Dir.abs[Dir.R[targetDir]]] -- N/S to E, E/W to S.
     local curPos = leftTop
     for i=1,numLanes do
-      lanes[i] = {pos = curPos}
+      laneStarts[i] = {pos = curPos}
       curPos = Pos.add(curPos, perpendicularOffset)
     end
   else
@@ -67,29 +67,29 @@ function planLanes(player, leftTop, numLanes, startDir, targetDir)
       Pos.add(leftTop, Pos.mul(Dir.toOffset[targetDir], -(numLanes-1)))
 
     for i=1,numLanes do
-      lanes[i] = {pos = curPos, cornerLength = numLanes - i + 1}
+      laneStarts[i] = {pos = curPos, cornerLength = numLanes - i + 1}
       curPos = Pos.add(curPos, Dir.toOffset[targetDir])
       curPos = Pos.sub(curPos, Dir.toOffset[startDir])
     end
   end
 
-  return lanes
+  return laneStarts
 end
 
--- Place belts in a straight line from curPos to destPos, using undergrounds to jump over obstacles.
+-- Plan belts to use in a straight line from curPos to targetPos, using undergrounds to jump over obstacles.
 -- TODO: configure undergrounding strategy.
-function planBelts(player, beltProto, lanes, dir, destPos)
+function planBelts(player, beltProto, lanes, dir, targetPos)
   local perpendicularOffset = Dir.toOffset[Dir.abs[Dir.R[dir]]] -- N/S to E, E/W to S.
   local undergroundProto = getUndergroundForBelt(beltProto)
   local belts = {}
-  local lastPos = nil
+  local endPos = nil
 
   for laneIdx,lane in pairs(lanes) do
-    local length = Pos.proj(Pos.sub(destPos, lane.pos), dir)
+    local length = Pos.proj(Pos.sub(targetPos, lane.pos), dir)
     local beltPosAt = function(i) return Pos.add(lane.pos, Pos.mul(Dir.toOffset[dir], i-1)) end
     local i=1
-    if not lastPos then
-      lastPos = Pos.add(lane.pos, Pos.mul(Dir.toOffset[dir], length))
+    if not endPos then
+      endPos = Pos.add(lane.pos, Pos.mul(Dir.toOffset[dir], length))
     end
 
     while i <= length+1 do
@@ -98,7 +98,7 @@ function planBelts(player, beltProto, lanes, dir, destPos)
       local inCorner = (lane.cornerLength and i <= lane.cornerLength)
       if not inCorner and isObstructed(player, beltPosAt(i), dir) then
         if #belts > 0 and belts[#belts].proto == undergroundProto then
-          return false
+          return nil
         end
         belts[#belts] = {proto=undergroundProto, type="input", pos=beltPosAt(i-1)}
         local j = i+1
@@ -109,7 +109,7 @@ function planBelts(player, beltProto, lanes, dir, destPos)
           belts[#belts+1] = {proto=undergroundProto, type="output", pos=beltPosAt(j)}
           i = j+1
         else
-          return false
+          return nil
         end
       else
         belts[#belts+1] = {proto=beltProto, pos=beltPosAt(i)}
@@ -118,7 +118,7 @@ function planBelts(player, beltProto, lanes, dir, destPos)
     end
   end
 
-  return {lastPos=lastPos, belts=belts}
+  return {endPos=endPos, belts=belts, dir=dir}
 end
 
 -- Returns true if building a belt on the given tile would fail.
@@ -141,6 +141,23 @@ function isObstructed(player, pos, dir)
   return false
 end
 
+-- Tries to plan a belt path from `startPos` to `targetPos`, possibly rearranging belts at
+-- `startPos` to turn a corner.
+-- On success, returns {endPos, belts, dir} where belts is an array of {proto, type, pos} used by placeBelts.
+function findAndPlanPath(player, beltProto, startPos, targetPos)
+  local lastEntity = findEntity(player, beltProto.name, startPos)
+  if not (lastEntity and lastEntity.valid) then
+    -- TODO do we need this? just place a lane from lastPlacedBelt.pos
+    debug(player, "couldn't find previous belt %s at %d,%d", beltProto.name, startPos.x, startPos.y)
+    return
+  end
+
+  local dir = Dir.getPrimary(startPos, targetPos)
+  local laneInfo = findParallelLanes(player, beltProto, lastEntity)
+  local lanes = planLaneStarts(player, laneInfo.leftTop, laneInfo.count, lastEntity.direction, dir)
+  return planBelts(player, beltProto, lanes, dir, targetPos)
+end
+
 -- Given a list of planned belts (output of planBelts), actually place them in the world.
 function placeBelts(player, belts, dir)
   for i,belt in pairs(belts) do
@@ -148,7 +165,6 @@ function placeBelts(player, belts, dir)
   end
 end
 
--- p.surface.create_entity{name="orange-arrow-with-circle", position={x,y}, direction=defines.direction.north, force=p.force, player=p}
 -- Place a single belt at the position, or a ghost if we're all out.
 function placeBelt(player, beltProto, pos, dir, optType)
   if player.can_place_entity{name = beltProto.name, position = pos, direction = dir} and
@@ -205,14 +221,17 @@ function getUndergroundForBelt(beltProto)
   return speedToUnderground[beltProto.belt_speed]
 end
 
+-- Creates a 10x10 square of "detectors" centered at the given position.
+-- A detector is an invisible entity that serves as a hacky way to detect when the
+-- player's cursor moves position (via the on_selected_entity_changed event).
 function centerDetectorsAt(player, pos)
-  local radius = 10
+  local kRadius = 10
   local _, pdata = Player.get(player.index)
 
   destroyDetectors(player)
 
-  for x = -radius, radius do
-    for y = -radius, radius do
+  for x = -kRadius, kRadius do
+    for y = -kRadius, kRadius do
       local entity = player.surface.create_entity{
         name="quickbelt-cursor-detector",
         position=Pos.add(pos, {x=x, y=y}),
@@ -225,9 +244,9 @@ function centerDetectorsAt(player, pos)
       end
     end
   end
-
 end
 
+-- Destroys all detectors created by centerDetectorsAt.
 function destroyDetectors(player)
   local entities = player.surface.find_entities_filtered{name="quickbelt-cursor-detector"}
   for _, e in pairs(entities) do
@@ -235,29 +254,16 @@ function destroyDetectors(player)
   end
 end
 
-local kMarkerColor = {0,1,1}
-function drawMarkersTo(player, destPos)
+-- Draws a set of markers denoting the path given by `findAndPlanPath` to the targetPos.
+-- Does nothing if no path exists.
+function drawMarkers(player, targetPos)
+  local kMarkerColor = {0,1,1}
   local _, pdata = Player.get(player.index)
 
-  for _, id in pairs(pdata.markers or {}) do
-    rendering.destroy(id)
-  end
-  pdata.markers = nil
+  destroyMarkers(player)
 
-  if destPos == nil then
-    return
-  end
-
-  local lastEntity = findEntity(player, pdata.lastBelt.proto.name, pdata.lastBelt.pos)
-  if not (lastEntity and lastEntity.valid) then
-    debug(player, "couldn't find previous belt %s at %d,%d", pdata.lastBelt.proto.name, pdata.lastBelt.pos.x, pdata.lastBelt.pos.y)
-    return
-  end
-
-  local dir = Dir.getPrimary(pdata.lastBelt.pos, destPos)
-  local laneInfo = findParallelLanes(player, pdata.lastBelt.proto, lastEntity)
-  local lanes = planLanes(player, laneInfo.leftTop, laneInfo.count, lastEntity.direction, dir)
-  local rv = planBelts(player, pdata.lastBelt.proto, lanes, dir, destPos)
+  if not pdata.lastPlacedBelt then return end  -- shouldn't happen
+  local rv = findAndPlanPath(player, pdata.lastPlacedBelt.proto, pdata.lastPlacedBelt.pos, targetPos)
   if not rv then
     return
   end
@@ -267,7 +273,7 @@ function drawMarkersTo(player, destPos)
     markers[#markers+1] = rendering.draw_sprite{
       sprite = 'quickbelt-marker',
       tint = kMarkerColor,
-      orientation = Dir.toOrientation[dir],
+      orientation = Dir.toOrientation[rv.dir],
       target = Pos.add(belt.pos, {x=.5, y=.5}),
       surface = player.surface,
       players = {player.index},
@@ -276,12 +282,36 @@ function drawMarkersTo(player, destPos)
   pdata.markers = markers
 end
 
-local modIsPlacing = false
+-- Destroys all markers currently being drawn.
+function destroyMarkers(player)
+  local _, pdata = Player.get(player.index)
+  for _, id in pairs(pdata.markers or {}) do
+    rendering.destroy(id)
+  end
+  pdata.markers = nil
+end
+
+-- Enters belt placement mode, using detectors to keep track of where the cursor is.
+function beginPlacementMode(player, beltProto, pos)
+  local _, pdata = Player.get(player.index)
+  if pdata.isPlacing then return end
+  pdata.isPlacing = true
+  centerDetectorsAt(player, pos)
+end
+
+-- Ends belt placement mode, cleaning up any marker UI and detector entities.
+function endPlacementMode(player)
+  local _, pdata = Player.get(player.index)
+  if not pdata.isPlacing then return end
+  pdata.isPlacing = false
+  destroyDetectors(player)
+  destroyMarkers(player)
+end
+
 script.on_event(defines.events.on_built_entity, function(event)
   local player, pdata = Player.get(event.player_index)
   local pos = event.created_entity.bounding_box.left_top
   local proto = event.created_entity.prototype
-  local lastBelt = pdata.lastBelt
 
   -- Ignore events generated by this mod itself.
   if pdata.modIsPlacing then return end
@@ -292,34 +322,26 @@ script.on_event(defines.events.on_built_entity, function(event)
     proto = event.created_entity.ghost_prototype
     if proto.type ~= "transport-belt" then return end
 
-    if lastBelt then
-      local lastEntity = findEntity(player, lastBelt.proto.name, lastBelt.pos)
-      if not (lastEntity and lastEntity.valid) then
-        debug(player, "couldn't find previous belt %s at %d,%d", lastBelt.proto.name, lastBelt.pos.x, lastBelt.pos.y)
-        return
-      end
-
-      local dir = Dir.getPrimary(lastBelt.pos, pos)
-      local laneInfo = findParallelLanes(player, proto, lastEntity)
-      local lanes = planLanes(player, laneInfo.leftTop, laneInfo.count, lastEntity.direction, dir)
-
-      event.created_entity.destroy() -- remove the ghost entity first; may invalidate lastEntity
-      local rv = planBelts(player, proto, lanes, dir, pos)
+    if pdata.lastPlacedBelt then
+      local rv = findAndPlanPath(player, pdata.lastPlacedBelt.proto, pdata.lastPlacedBelt.pos, pos)
+      -- Entity may have been paved over alredy. If not, remove it, since it's only used as a signal to the mod.
+      if event.created_entity.valid then event.created_entity.destroy() end
       if not rv then
         player.print("Cannot find a clear path to place belts.")
         return
       end
 
       pdata.modIsPlacing = true
-      placeBelts(player, rv.belts, dir)
+      placeBelts(player, rv.belts, rv.dir)
       pdata.modIsPlacing = false
-      pos = rv.lastPos
+      pos = rv.endPos
     end
   elseif proto.type ~= "transport-belt" then
     return
   end
 
-  pdata.lastBelt = { proto = proto, pos = pos }
+  pdata.lastPlacedBelt = {proto = proto, pos = pos}
+  beginPlacementMode(player, proto, pos)
 end,
 {{filter = "transport-belt-connectable"}, {filter = "ghost"}})
 
@@ -334,18 +356,13 @@ script.on_event(defines.events.on_player_cursor_stack_changed, function(event)
   end
 
   if cursorEntity and cursorEntity.belt_speed then
-    pdata.isPlacing = true
-    centerDetectorsAt(player, player.position)
     debug(player, "Belt selected, creating entities")
+    beginPlacementMode(player, cursorEntity, player.position)
     return
   end
 
-  -- Not a belt, end placement mode.
   debug(player, "End placement mode")
-  pdata.isPlacing = false
-  pdata.lastBelt = nil
-  destroyDetectors(player)
-  drawMarkersTo(player, nil)
+  endPlacementMode(player)
 end)
 
 script.on_event(defines.events.on_selected_entity_changed, function(event)
@@ -354,13 +371,12 @@ script.on_event(defines.events.on_selected_entity_changed, function(event)
     debug(player, "Selected changed: %d,%d (%d)", player.selected.bounding_box.left_top.x,  player.selected.bounding_box.left_top.y,
       player.selected ~= pdata.centerDetector and 1 or 0)
     if player.selected ~= pdata.centerDetector then
-      local destPos = player.selected.bounding_box.left_top
-      drawMarkersTo(player, destPos)
-      centerDetectorsAt(player, destPos)
+      local targetPos = player.selected.bounding_box.left_top
+      drawMarkers(player, targetPos)
+      centerDetectorsAt(player, targetPos)
     end
   end
 end)
-
 
 
 -- TODO:
