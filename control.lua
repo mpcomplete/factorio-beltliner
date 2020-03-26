@@ -132,10 +132,10 @@ function isObstructed(player, pos, dir)
     if proto.belt_speed and e.direction == dir then
       return false
     elseif proto.collision_mask and proto.collision_mask["object-layer"] then
-      -- debug(player, "obstruction at %d,%d: %s", pos.x, pos.y, e.name)
+      -- debug(player, "obstruction at %s: %s", Pos.str(pos), e.name)
       return true
     else
-      debug(player, "ignoring non-collider at %d,%d: %s", pos.x, pos.y, e.name)
+      debug(player, "ignoring non-collider at %s: %s", Pos.str(pos), e.name)
     end
   end
   return false
@@ -148,7 +148,7 @@ function findAndPlanPath(player, beltProto, startPos, targetPos)
   local lastEntity = findEntity(player, beltProto.name, startPos)
   if not (lastEntity and lastEntity.valid) then
     -- TODO do we need this? just place a lane from lastPlacedBelt.pos
-    debug(player, "couldn't find previous belt %s at %d,%d", beltProto.name, startPos.x, startPos.y)
+    debug(player, "couldn't find previous belt %s at %s", beltProto.name, Pos.str(startPos))
     return
   end
 
@@ -228,19 +228,41 @@ function centerDetectorsAt(player, pos)
   local kRadius = 10
   local _, pdata = Player.get(player.index)
 
-  destroyDetectors(player)
+  local function bboxContains(bbox, pos)
+    return (pos.x >= bbox.left_top.x and pos.x <= bbox.right_bottom.x and
+            pos.y >= bbox.left_top.y and pos.y <= bbox.right_bottom.y)
+  end
 
+  local radiusOffset = {x=kRadius, y=kRadius}
+  local newBbox = {
+    left_top = Pos.sub(pos, radiusOffset),
+    right_bottom = Pos.add(pos, radiusOffset)
+  }
+  local oldBbox
+  if pdata.centerDetectorPos then
+    -- Remove detectors outside the new region.
+    oldBbox = {
+      left_top = Pos.sub(pdata.centerDetectorPos, radiusOffset),
+      right_bottom = Pos.add(pdata.centerDetectorPos, radiusOffset)
+    }
+    local entities = player.surface.find_entities_filtered{area=oldBbox, name="quickbelt-cursor-detector"}
+    for _, e in pairs(entities) do
+      if not bboxContains(newBbox, e.bounding_box.left_top) then e.destroy() end
+    end
+  end
+
+  pdata.centerDetectorPos = pos
   for x = -kRadius, kRadius do
     for y = -kRadius, kRadius do
-      local entity = player.surface.create_entity{
-        name="quickbelt-cursor-detector",
-        position=Pos.add(pos, {x=x, y=y}),
-        direction=Dir.N,
-        force=player.force,
-        player=player
-      }
-      if x == 0 and y == 0 then
-        pdata.centerDetector = entity
+      local cellPos = Pos.add(pos, {x=x, y=y})
+      if not oldBbox or not bboxContains(oldBbox, cellPos) then
+        local entity = player.surface.create_entity{
+          name="quickbelt-cursor-detector",
+          position=cellPos,
+          direction=Dir.N,
+          force=player.force,
+          player=player
+        }
       end
     end
   end
@@ -356,29 +378,19 @@ script.on_event(defines.events.on_player_cursor_stack_changed, function(event)
   end
 
   if cursorEntity and cursorEntity.belt_speed then
-    debug(player, "Belt selected, creating entities")
     beginPlacementMode(player, cursorEntity, player.position)
     return
   end
 
-  debug(player, "End placement mode")
   endPlacementMode(player)
 end)
 
 script.on_event(defines.events.on_selected_entity_changed, function(event)
   local player, pdata = Player.get(event.player_index)
   if pdata.isPlacing and player.selected then
-    debug(player, "Selected changed: %d,%d (%d)", player.selected.bounding_box.left_top.x,  player.selected.bounding_box.left_top.y,
-      player.selected ~= pdata.centerDetector and 1 or 0)
-    if player.selected ~= pdata.centerDetector then
-      local targetPos = player.selected.bounding_box.left_top
-      drawMarkers(player, targetPos)
-      centerDetectorsAt(player, targetPos)
-    end
+    local targetPos = player.selected.bounding_box.left_top
+    debug(player, "Cursor moved: %s", Pos.str(targetPos))
+    drawMarkers(player, targetPos)
+    centerDetectorsAt(player, targetPos)
   end
 end)
-
-
--- TODO:
--- reuse detectors in overlapping boundary
--- clear drawing path

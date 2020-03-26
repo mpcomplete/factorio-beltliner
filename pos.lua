@@ -22,4 +22,8 @@ function Pos.eq(a, b)
   return a.x == b.x and a.y == b.y
 end
 
+function Pos.str(pos)
+  return string.format("(%d, %d)", pos.x, pos.y)
+end
+
 return Pos
