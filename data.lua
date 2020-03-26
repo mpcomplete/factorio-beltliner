@@ -1,4 +1,12 @@
 data:extend({
+  -- Shortcut keys
+  {
+    type = "custom-input",
+    name = "quickbelt-reverse",
+    key_sequence = "",
+    linked_game_control = "rotate",
+    consuming = "none"
+  },
   -- An invisible entity used for detecting where the mouse cursor is.
   {
     type = "simple-entity",

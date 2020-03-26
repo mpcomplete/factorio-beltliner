@@ -118,7 +118,7 @@ function planBelts(player, beltProto, lanes, dir, targetPos)
     end
   end
 
-  return {endPos=endPos, belts=belts, dir=dir}
+  return {endPos=endPos, belts=belts}
 end
 
 -- Returns true if building a belt on the given tile would fail.
@@ -129,7 +129,7 @@ function isObstructed(player, pos, dir)
   end
   for _, e in pairs(player.surface.find_entities{pos, Pos.add(pos, {x=.5,y=.5})}) do
     local proto = e.name == "entity-ghost" and e.ghost_prototype or e.prototype
-    if proto.belt_speed and e.direction == dir then
+    if proto.belt_speed and Dir.isParallel(e.direction, dir) then
       return false
     elseif proto.collision_mask and proto.collision_mask["object-layer"] then
       -- debug(player, "obstruction at %s: %s", Pos.str(pos), e.name)
@@ -145,6 +145,7 @@ end
 -- `startPos` to turn a corner.
 -- On success, returns {endPos, belts, dir} where belts is an array of {proto, type, pos} used by placeBelts.
 function findAndPlanPath(player, beltProto, startPos, targetPos)
+  local _, pdata = Player.get(player.index)
   local lastEntity = findEntity(player, beltProto.name, startPos)
   if not (lastEntity and lastEntity.valid) then
     -- TODO do we need this? just place a lane from lastPlacedBelt.pos
@@ -155,7 +156,11 @@ function findAndPlanPath(player, beltProto, startPos, targetPos)
   local dir = Dir.getPrimary(startPos, targetPos)
   local laneInfo = findParallelLanes(player, beltProto, lastEntity)
   local lanes = planLaneStarts(player, laneInfo.leftTop, laneInfo.count, lastEntity.direction, dir)
-  return planBelts(player, beltProto, lanes, dir, targetPos)
+  local rv = planBelts(player, beltProto, lanes, dir, targetPos)
+  if rv then
+    rv.dir = pdata.beltReverse and Dir.R[Dir.R[dir]] or dir
+  end
+  return rv
 end
 
 -- Given a list of planned belts (output of planBelts), actually place them in the world.
@@ -357,6 +362,7 @@ script.on_event(defines.events.on_built_entity, function(event)
       placeBelts(player, rv.belts, rv.dir)
       pdata.modIsPlacing = false
       pos = rv.endPos
+      pdata.beltReverse = false
     end
   elseif proto.type ~= "transport-belt" then
     return
@@ -385,12 +391,23 @@ script.on_event(defines.events.on_player_cursor_stack_changed, function(event)
   endPlacementMode(player)
 end)
 
-script.on_event(defines.events.on_selected_entity_changed, function(event)
-  local player, pdata = Player.get(event.player_index)
+function updateMarkers(player)
+  local _, pdata = Player.get(player.index)
   if pdata.isPlacing and player.selected then
     local targetPos = player.selected.bounding_box.left_top
-    debug(player, "Cursor moved: %s", Pos.str(targetPos))
+    -- debug(player, "Cursor moved: %s", Pos.str(targetPos))
     drawMarkers(player, targetPos)
     centerDetectorsAt(player, targetPos)
   end
+end
+
+script.on_event(defines.events.on_selected_entity_changed, function(event)
+  local player, pdata = Player.get(event.player_index)
+  updateMarkers(player)
+end)
+
+script.on_event("quickbelt-reverse", function(event)
+  local player, pdata = Player.get(event.player_index)
+  pdata.beltReverse = not pdata.beltReverse
+  updateMarkers(player)
 end)
