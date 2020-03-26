@@ -1,24 +1,5 @@
-
-local belt_sprite_prototypes = {}
-do
-    local i = 1
-    for x = 0, 512 - 32, 32 do
-        belt_sprite_prototypes[i] = {
-            type = 'sprite',
-            name = 'quickbelt-marker-' .. i,
-            width = 32,
-            height = 32,
-            x = x,
-            y = 0,
-            filename = '__PickerBeltTools__/graphics/entity/markers/belt-arrows.png'
-        }
-        i = i + 1
-    end
-end
-
-data:extend(belt_sprite_prototypes)
-
 data:extend({
+  -- An invisible entity used for detecting where the mouse cursor is.
   {
     type = "simple-entity",
     name = "quickbelt-cursor-detector",
@@ -34,5 +15,15 @@ data:extend({
       height = 42,
       shift = {.5, .5},
     },
+  },
+  -- An sprite used for drawing belt paths. Borrowed from PickerBeltTools.
+  {
+    type = 'sprite',
+    name = 'quickbelt-marker',
+    width = 32,
+    height = 32,
+    x = 0,
+    y = 0,
+    filename = '__QuickBelt__/assets/marker.png'
   },
 })

@@ -235,6 +235,7 @@ function destroyDetectors(player)
   end
 end
 
+local kMarkerColor = {0,1,1}
 function drawMarkersTo(player, destPos)
   local _, pdata = Player.get(player.index)
 
@@ -263,34 +264,17 @@ function drawMarkersTo(player, destPos)
 
   local markers = {}
   for _,belt in pairs(rv.belts) do
-    markers[#markers+1] = drawMarker(player, belt.pos, dir)
+    markers[#markers+1] = rendering.draw_sprite{
+      sprite = 'quickbelt-marker',
+      tint = kMarkerColor,
+      orientation = Dir.toOrientation[dir],
+      target = Pos.add(belt.pos, {x=.5, y=.5}),
+      surface = player.surface,
+      players = {player.index},
+    }
   end
   pdata.markers = markers
 end
-
-function drawMarker(player, pos, dir)
-  local kMarkerColor = {0,1,1}
-
-  if true then 
-    return rendering.draw_sprite{
-      sprite = 'picker-belt-marker-6',
-      tint = kMarkerColor,
-      orientation = Dir.toOrientation[dir],
-      target = Pos.add(pos, {x=.5, y=.5}),
-      surface = player.surface,
-      players = {player.index}
-    }
-  else
-    return rendering.draw_line{
-      color = kMarkerColor,
-      width = 8,
-      from = pos,
-      to = Pos.add(pos, Dir.toOffset[dir]),
-      surface = player.surface
-    }
-  end
-end
-
 
 local modIsPlacing = false
 script.on_event(defines.events.on_built_entity, function(event)
