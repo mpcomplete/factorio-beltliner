@@ -331,6 +331,7 @@ function endPlacementMode(player)
   local _, pdata = Player.get(player.index)
   if not pdata.isPlacing then return end
   pdata.isPlacing = false
+  pdata.beltReverse = false
   destroyDetectors(player)
   destroyMarkers(player)
 end
@@ -362,7 +363,6 @@ script.on_event(defines.events.on_built_entity, function(event)
       placeBelts(player, rv.belts, rv.dir)
       pdata.modIsPlacing = false
       pos = rv.endPos
-      pdata.beltReverse = false
     end
   elseif proto.type ~= "transport-belt" then
     return
