@@ -326,28 +326,38 @@ end,
 script.on_event(defines.events.on_player_cursor_stack_changed, function(event)
   local player, pdata = Player.get(event.player_index)
 
-  pdata.isPlacing = false
-  if pdata.lastBelt and player.cursor_stack.valid and player.cursor_stack.valid_for_read then
-    local cursorEntity = player.cursor_stack.prototype.place_result
-    if cursorEntity and cursorEntity.belt_speed then
-      pdata.isPlacing = true
-      centerDetectorsAt(player, player.position)
-      return
-    end
-
-    -- Not a belt, end placement mode.
-    pdata.lastBelt = nil
+  local cursorEntity = nil
+  if player.cursor_stack and player.cursor_stack.valid and player.cursor_stack.valid_for_read then
+    cursorEntity = player.cursor_stack.prototype.place_result
+  elseif player.cursor_ghost and player.cursor_ghost.valid then
+    cursorEntity = player.cursor_ghost.place_result
   end
 
+  if cursorEntity and cursorEntity.belt_speed then
+    pdata.isPlacing = true
+    centerDetectorsAt(player, player.position)
+    debug(player, "Belt selected, creating entities")
+    return
+  end
+
+  -- Not a belt, end placement mode.
+  debug(player, "End placement mode")
+  pdata.isPlacing = false
+  pdata.lastBelt = nil
   destroyDetectors(player)
+  drawMarkersTo(player, nil)
 end)
 
 script.on_event(defines.events.on_selected_entity_changed, function(event)
   local player, pdata = Player.get(event.player_index)
-  if pdata.isPlacing and player.selected and player.selected ~= pdata.centerDetector then
-    local destPos = player.selected.bounding_box.left_top
-    drawMarkersTo(player, destPos)
-    centerDetectorsAt(player, destPos)
+  if pdata.isPlacing and player.selected then
+    debug(player, "Selected changed: %d,%d (%d)", player.selected.bounding_box.left_top.x,  player.selected.bounding_box.left_top.y,
+      player.selected ~= pdata.centerDetector and 1 or 0)
+    if player.selected ~= pdata.centerDetector then
+      local destPos = player.selected.bounding_box.left_top
+      drawMarkersTo(player, destPos)
+      centerDetectorsAt(player, destPos)
+    end
   end
 end)
 
@@ -356,4 +366,3 @@ end)
 -- TODO:
 -- reuse detectors in overlapping boundary
 -- clear drawing path
--- use picker markers
