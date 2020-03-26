@@ -10,22 +10,29 @@ Dir.W = defines.direction.west
 Dir.toOffset = {
   [Dir.N] = {x= 0, y=-1},
   [Dir.S] = {x= 0, y= 1},
-  [Dir.E]  = {x= 1, y= 0},
-  [Dir.W]  = {x=-1, y= 0},
+  [Dir.E] = {x= 1, y= 0},
+  [Dir.W] = {x=-1, y= 0},
+}
+-- Convert a direction to an orientation (e.g. a percentage clockwise rotation from north).
+Dir.toOrientation = {
+  [Dir.N] = 0,
+  [Dir.E] = .25,
+  [Dir.S] = .50,
+  [Dir.W] = .75,
 }
 -- Convert a direction to the positive X/Y axis: S and E.
 Dir.abs = {
   [Dir.N] = Dir.S,
   [Dir.S] = Dir.S,
-  [Dir.E]  = Dir.E,
-  [Dir.W]  = Dir.E,
+  [Dir.E] = Dir.E,
+  [Dir.W] = Dir.E,
 }
 -- Single 90 degree clockwise rotation.
 Dir.R  = {
   [Dir.N] = Dir.E,
-  [Dir.E]  = Dir.S,
+  [Dir.E] = Dir.S,
   [Dir.S] = Dir.W,
-  [Dir.W]  = Dir.N,
+  [Dir.W] = Dir.N,
 }
 
 function Dir.isParallel(a, b)
