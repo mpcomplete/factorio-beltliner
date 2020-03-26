@@ -50,7 +50,10 @@ function findParallelLanes(player, beltProto, entity)
 end
 
 -- Plan the start position for each lane of belts, potentially handling a corner.
+-- `startDir` is the existing belt direction, `targetDir` is the direction the belts
+-- will go in.
 function planLaneStarts(player, leftTop, numLanes, startDir, targetDir)
+  local _, pdata = Player.get(player.index)
   local laneStarts = {}
 
   if Dir.isParallel(startDir, targetDir) then
@@ -61,10 +64,18 @@ function planLaneStarts(player, leftTop, numLanes, startDir, targetDir)
       curPos = Pos.add(curPos, perpendicularOffset)
     end
   else
-    -- If we're heading east or south, then the top left is the furthest belt. Otherwise, the bottom left is.
+    -- If we're turning east or south, then the top left is the furthest belt. Otherwise, the bottom left is.
     local curPos = (targetDir == Dir.E or targetDir == Dir.S) and
       leftTop or
       Pos.add(leftTop, Pos.mul(Dir.toOffset[targetDir], -(numLanes-1)))
+    
+    if pdata.beltReverse then
+      -- If we're reversing belts, then the laneStarts actually represent the end of the the lane.
+      -- So we have to handle the corner in the opposite direction. startDir is reversed, and we end
+      -- the lane a tile earlier so the existing belt follows the corner.
+      curPos = Pos.add(curPos, Dir.toOffset[targetDir])
+      startDir = Dir.R[Dir.R[startDir]]
+    end
 
     for i=1,numLanes do
       laneStarts[i] = {pos = curPos, cornerLength = numLanes - i + 1}
@@ -122,7 +133,7 @@ function planBelts(player, beltProto, lanes, dir, targetPos)
 end
 
 -- Returns true if building a belt on the given tile would fail.
--- Ignores existing belts facing the same direction.
+-- Ignores existing belts facing a parallel direction.
 function isObstructed(player, pos, dir)
   if player.surface.can_place_entity{name = "transport-belt", position = pos, direction = dir} then
     return false
@@ -197,7 +208,6 @@ function placeGhost(player, beltProto, pos, dir, optType)
      (existing[1].name == "entity-ghost" and existing[1].ghost_prototype.name == beltProto.name)) and
      existing[1].direction ~= dir then
     player.surface.deconstruct_area{area={pos, Pos.add(pos, {x=.1,y=.1})}, force=player.force, player=player}
-  -- existingGhost[1].destroy()
   end
   player.surface.create_entity{
     name="entity-ghost",
