@@ -93,15 +93,11 @@ function planBelts(player, beltProto, lanes, dir, targetPos)
   local perpendicularOffset = Dir.toOffset[Dir.abs[Dir.R[dir]]] -- N/S to E, E/W to S.
   local undergroundProto = getUndergroundForBelt(beltProto)
   local belts = {}
-  local endPos = nil
 
   for laneIdx,lane in pairs(lanes) do
     local length = Pos.proj(Pos.sub(targetPos, lane.pos), dir)
     local beltPosAt = function(i) return Pos.add(lane.pos, Pos.mul(Dir.toOffset[dir], i-1)) end
     local i=1
-    if not endPos then
-      endPos = Pos.add(lane.pos, Pos.mul(Dir.toOffset[dir], length))
-    end
 
     while i <= length+1 do
       -- Don't worry about obstructions when doing corners - old belts are there that would count as obstructions, and
@@ -129,7 +125,7 @@ function planBelts(player, beltProto, lanes, dir, targetPos)
     end
   end
 
-  return {endPos=endPos, belts=belts}
+  return belts
 end
 
 -- Returns true if building a belt on the given tile would fail.
@@ -154,7 +150,7 @@ end
 
 -- Tries to plan a belt path from `startPos` to `targetPos`, possibly rearranging belts at
 -- `startPos` to turn a corner.
--- On success, returns {endPos, belts, dir} where belts is an array of {proto, type, pos} used by placeBelts.
+-- On success, returns {belts, dir} where belts is an array of {proto, type, pos} used by placeBelts.
 function findAndPlanPath(player, beltProto, startPos, targetPos)
   local _, pdata = Player.get(player.index)
   local lastEntity = findEntity(player, beltProto.name, startPos)
@@ -167,11 +163,11 @@ function findAndPlanPath(player, beltProto, startPos, targetPos)
   local dir = Dir.getPrimary(startPos, targetPos)
   local laneInfo = findParallelLanes(player, beltProto, lastEntity)
   local lanes = planLaneStarts(player, laneInfo.leftTop, laneInfo.count, lastEntity.direction, dir)
-  local rv = planBelts(player, beltProto, lanes, dir, targetPos)
-  if rv then
-    rv.dir = pdata.beltReverse and Dir.R[Dir.R[dir]] or dir
-  end
-  return rv
+  local belts = planBelts(player, beltProto, lanes, dir, targetPos)
+  return {
+    belts = belts,
+    dir = pdata.beltReverse and Dir.R[Dir.R[dir]] or dir
+  }
 end
 
 -- Given a list of planned belts (output of planBelts), actually place them in the world.
@@ -301,7 +297,7 @@ function drawMarkers(player, targetPos)
 
   if not pdata.lastPlacedBelt then return end  -- shouldn't happen
   local rv = findAndPlanPath(player, pdata.lastPlacedBelt.proto, pdata.lastPlacedBelt.pos, targetPos)
-  if not rv then
+  if not rv.belts then
     return
   end
 
@@ -364,7 +360,7 @@ script.on_event(defines.events.on_built_entity, function(event)
       local rv = findAndPlanPath(player, pdata.lastPlacedBelt.proto, pdata.lastPlacedBelt.pos, pos)
       -- Entity may have been paved over alredy. If not, remove it, since it's only used as a signal to the mod.
       if event.created_entity.valid then event.created_entity.destroy() end
-      if not rv then
+      if not rv.belts then
         player.print("Cannot find a clear path to place belts.")
         return
       end
@@ -372,7 +368,8 @@ script.on_event(defines.events.on_built_entity, function(event)
       pdata.modIsPlacing = true
       placeBelts(player, rv.belts, rv.dir)
       pdata.modIsPlacing = false
-      pos = rv.endPos
+      proto = pdata.lastPlacedBelt.proto
+      pos = rv.belts[#rv.belts].pos
     end
   elseif proto.type ~= "transport-belt" then
     return
@@ -393,7 +390,7 @@ script.on_event(defines.events.on_player_cursor_stack_changed, function(event)
     cursorEntity = player.cursor_ghost.place_result
   end
 
-  if cursorEntity and cursorEntity.belt_speed then
+  if cursorEntity and cursorEntity.type == "transport-belt" then
     beginPlacementMode(player, cursorEntity, player.position)
     return
   end
