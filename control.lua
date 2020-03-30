@@ -157,7 +157,7 @@ function findAndPlanPath(player, beltProto, startPos, targetPos)
   if not (lastEntity and lastEntity.valid) then
     -- TODO do we need this? just place a lane from lastPlacedBelt.pos
     debug(player, "couldn't find previous belt %s at %s", beltProto.name, Pos.str(startPos))
-    return
+    return {}
   end
 
   local dir = Dir.getPrimary(startPos, targetPos)
