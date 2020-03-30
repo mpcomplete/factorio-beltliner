@@ -142,7 +142,7 @@ function isObstructed(player, pos, dir)
       -- debug(player, "obstruction at %s: %s", Pos.str(pos), e.name)
       return true
     else
-      debug(player, "ignoring non-collider at %s: %s", Pos.str(pos), e.name)
+      -- debug(player, "ignoring non-collider at %s: %s", Pos.str(pos), e.name)
     end
   end
   return false
@@ -156,7 +156,7 @@ function findAndPlanPath(player, beltProto, startPos, targetPos)
   local lastEntity = findEntity(player, beltProto.name, startPos)
   if not (lastEntity and lastEntity.valid) then
     -- TODO do we need this? just place a lane from lastPlacedBelt.pos
-    debug(player, "couldn't find previous belt %s at %s", beltProto.name, Pos.str(startPos))
+    -- debug(player, "couldn't find previous belt %s at %s", beltProto.name, Pos.str(startPos))
     return {}
   end
 
@@ -281,6 +281,8 @@ end
 
 -- Destroys all detectors created by centerDetectorsAt.
 function destroyDetectors(player)
+  local _, pdata = Player.get(player.index)
+  pdata.centerDetectorPos = nil
   local entities = player.surface.find_entities_filtered{name="quickbelt-cursor-detector"}
   for _, e in pairs(entities) do
     e.destroy()
@@ -338,6 +340,7 @@ function endPlacementMode(player)
   if not pdata.isPlacing then return end
   pdata.isPlacing = false
   pdata.beltReverse = false
+  pdata.lastPlacedBelt = nil
   destroyDetectors(player)
   destroyMarkers(player)
 end
@@ -391,7 +394,7 @@ script.on_event(defines.events.on_player_cursor_stack_changed, function(event)
   end
 
   if cursorEntity and cursorEntity.type == "transport-belt" then
-    beginPlacementMode(player, cursorEntity, player.position)
+    -- beginPlacementMode(player, cursorEntity, player.position)
     return
   end
 
@@ -410,11 +413,15 @@ end
 
 script.on_event(defines.events.on_selected_entity_changed, function(event)
   local player, pdata = Player.get(event.player_index)
-  updateMarkers(player)
+  if pdata.isPlacing then
+    updateMarkers(player)
+  end
 end)
 
 script.on_event("quickbelt-reverse", function(event)
   local player, pdata = Player.get(event.player_index)
-  pdata.beltReverse = not pdata.beltReverse
-  updateMarkers(player)
+  if pdata.isPlacing then
+    pdata.beltReverse = not pdata.beltReverse
+    updateMarkers(player)
+  end
 end)

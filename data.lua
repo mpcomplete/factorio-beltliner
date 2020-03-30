@@ -18,6 +18,7 @@ data:extend({
     picture =
     {
       filename = "__QuickBelt__/assets/transparent.png",
+      -- filename = "__QuickBelt__/assets/debug-detector.png",
       priority = "extra-high",
       width = 42,
       height = 42,
