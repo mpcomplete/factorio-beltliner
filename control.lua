@@ -293,6 +293,7 @@ end
 -- Does nothing if no path exists.
 function drawMarkers(player, targetPos)
   local kMarkerColor = {0,1,1}
+  local kMarkerColorReverse = {1,.6,1}
   local _, pdata = Player.get(player.index)
 
   destroyMarkers(player)
@@ -307,7 +308,7 @@ function drawMarkers(player, targetPos)
   for _,belt in pairs(rv.belts) do
     markers[#markers+1] = rendering.draw_sprite{
       sprite = 'quickbelt-marker',
-      tint = kMarkerColor,
+      tint = pdata.beltReverse and kMarkerColorReverse or kMarkerColor,
       orientation = Dir.toOrientation[rv.dir],
       target = Pos.add(belt.pos, {x=.5, y=.5}),
       surface = player.surface,
