@@ -130,13 +130,14 @@ end
 
 -- Returns true if building a belt on the given tile would fail.
 -- Ignores existing belts facing a parallel direction.
+-- TODO: should do better about distinguishing obstacles with existing belts we can replace.
 function isObstructed(player, pos, dir)
   if player.surface.can_place_entity{name = "transport-belt", position = pos, direction = dir} then
     return false
   end
   for _, e in pairs(player.surface.find_entities{pos, Pos.add(pos, {x=.5,y=.5})}) do
     local proto = e.name == "entity-ghost" and e.ghost_prototype or e.prototype
-    if proto.belt_speed and Dir.isParallel(e.direction, dir) then
+    if (proto.type == "transport-belt" or proto.type == "underground-belt") and Dir.isParallel(e.direction, dir) then
       return false
     elseif proto.collision_mask and proto.collision_mask["object-layer"] then
       -- debug(player, "obstruction at %s: %s", Pos.str(pos), e.name)
@@ -178,9 +179,10 @@ function placeBelts(player, belts, dir)
 end
 
 -- Place a single belt at the position, or a ghost if we're all out.
+-- Note: we keep a single belt because the mod performs poorly when using ghost items.
 function placeBelt(player, beltProto, pos, dir, optType)
   if player.can_place_entity{name = beltProto.name, position = pos, direction = dir} and
-    player.get_item_count(beltProto.name) > 0 then
+    player.get_item_count(beltProto.name) > 1 then
       player.surface.create_entity{
         name=beltProto.name,
         position=pos,
