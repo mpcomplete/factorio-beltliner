@@ -90,6 +90,7 @@ end
 -- Plan belts to use in a straight line from curPos to targetPos, using undergrounds to jump over obstacles.
 -- TODO: configure undergrounding strategy.
 function planBelts(player, beltProto, lanes, dir, targetPos)
+  local _, pdata = Player.get(player.index)
   local perpendicularOffset = Dir.toOffset[Dir.abs[Dir.R[dir]]] -- N/S to E, E/W to S.
   local undergroundProto = getUndergroundForBelt(beltProto)
   local belts = {}
@@ -107,13 +108,13 @@ function planBelts(player, beltProto, lanes, dir, targetPos)
         if #belts > 0 and belts[#belts].proto == undergroundProto then
           return nil
         end
-        belts[#belts] = {proto=undergroundProto, type="input", pos=beltPosAt(i-1)}
+        belts[#belts] = {proto=undergroundProto, type=pdata.beltReverse and "output" or "input", pos=beltPosAt(i-1)}
         local j = i+1
         while j < length+1 and (isObstructed(player, beltPosAt(j), dir) or isObstructed(player, beltPosAt(j+1), dir)) do
           j = j + 1
         end
         if j < length+1 and j-i < undergroundProto.max_underground_distance then
-          belts[#belts+1] = {proto=undergroundProto, type="output", pos=beltPosAt(j)}
+          belts[#belts+1] = {proto=undergroundProto, type=pdata.beltReverse and "input" or "output", pos=beltPosAt(j)}
           i = j+1
         else
           return nil
