@@ -24,20 +24,6 @@ function findEntity(player, protoName, pos)
   return e
 end
 
-function findParallelLanes(player)
-  local _, pdata = Player.get(player.index)
-  if pdata.lastPlacedLane then --- @@@
-    local result = {leftTop = pdata.lastPlacedLane[1].pos, count = #pdata.lastPlacedLane, dir = pdata.lastPlacedDir}
-    for i, lane in pairs(pdata.lastPlacedLane) do
-      if lane.pos.x < result.leftTop.x or lane.pos.y < result.leftTop.y then
-        result.leftTop = lane.pos
-      end
-    end
---    debug(player, "findLanes: of %d, got %s, %d", result.count, Pos.str(result.leftTop), result.dir)
-    return result
-  end
-end
-
 -- Find number of parallel lanes that are immediately adjacent to and facing in the same direction as the given entity.
 function trackParallelLanes(player, entity)
   local _, pdata = Player.get(player.index)
@@ -64,25 +50,40 @@ function trackParallelLanes(player, entity)
   pdata.lastPlacedDir = entity.direction
 end
 
+function findParallelLanes(player)
+  local _, pdata = Player.get(player.index)
+  if pdata.lastPlacedLane then --- @@@
+    local result = {leftTop = pdata.lastPlacedLane[1].pos, count = #pdata.lastPlacedLane, dir = pdata.lastPlacedDir}
+    for i, lane in pairs(pdata.lastPlacedLane) do
+      if lane.pos.x < result.leftTop.x or lane.pos.y < result.leftTop.y then
+        result.leftTop = lane.pos
+      end
+    end
+--    debug(player, "findLanes: of %d, got %s, %d", result.count, Pos.str(result.leftTop), result.dir)
+    return result
+  end
+end
+
 -- Plan the start position for each lane of belts, potentially handling a corner.
--- `startDir` is the existing belt direction, `targetDir` is the direction the belts
--- will go in.
-function planLaneStarts(player, leftTop, numLanes, startDir, targetDir)
+-- `targetDir` is the direction the belts will go in.
+function planLaneStarts(player, targetDir)
   local _, pdata = Player.get(player.index)
   local laneStarts = {}
+  local laneInfo = findParallelLanes(player)
+  local startDir = laneInfo.dir
 
   if Dir.isParallel(startDir, targetDir) then
     local perpendicularOffset = Dir.toOffset[Dir.abs[Dir.R[targetDir]]] -- N/S to E, E/W to S.
-    local curPos = leftTop
-    for i=1,numLanes do
+    local curPos = laneInfo.leftTop
+    for i=1,laneInfo.count do
       laneStarts[i] = {pos = curPos}
       curPos = Pos.add(curPos, perpendicularOffset)
     end
   else
     -- If we're turning east or south, then the top left is the furthest belt. Otherwise, the bottom left is.
     local curPos = (targetDir == Dir.E or targetDir == Dir.S) and
-      leftTop or
-      Pos.add(leftTop, Pos.mul(Dir.toOffset[targetDir], -(numLanes-1)))
+      laneInfo.leftTop or
+      Pos.add(laneInfo.leftTop, Pos.mul(Dir.toOffset[targetDir], -(laneInfo.count-1)))
 
     if pdata.beltReverse then
       -- If we're reversing belts, then the laneStarts actually represent the end of the the lane.
@@ -92,8 +93,8 @@ function planLaneStarts(player, leftTop, numLanes, startDir, targetDir)
       startDir = Dir.R[Dir.R[startDir]]
     end
 
-    for i=1,numLanes do
-      laneStarts[i] = {pos = curPos, cornerLength = numLanes - i + 1}
+    for i=1,laneInfo.count do
+      laneStarts[i] = {pos = curPos, cornerLength = laneInfo.count - i + 1}
       curPos = Pos.add(curPos, Dir.toOffset[targetDir])
       curPos = Pos.sub(curPos, Dir.toOffset[startDir])
     end
@@ -102,31 +103,36 @@ function planLaneStarts(player, leftTop, numLanes, startDir, targetDir)
   return laneStarts
 end
 
--- Plan belts to use in a straight line from curPos to targetPos, using undergrounds to jump over obstacles.
+-- Plan belts to use in a straight line from startPos to targetPos, using undergrounds to jump over obstacles.
 -- TODO: configure undergrounding strategy.
-function planBelts(player, beltProto, lanes, dir, targetPos)
+function planBelts(player, beltProto, startPos, targetPos)
   local _, pdata = Player.get(player.index)
-  local perpendicularOffset = Dir.toOffset[Dir.abs[Dir.R[dir]]] -- N/S to E, E/W to S.
   local undergroundProto = getUndergroundForBelt(beltProto)
+  local perpendicularOffset = Dir.toOffset[Dir.abs[Dir.R[dir]]] -- N/S to E, E/W to S.
+  local targetDir = Dir.getPrimary(startPos, targetPos)
+
+  -- Find the start positions for each lane.
+  local laneStarts = planLaneStarts(player, targetDir)
+
   local belts = {}
   local laneEnds = {}
 
-  for laneIdx,lane in pairs(lanes) do
-    local length = Pos.proj(Pos.sub(targetPos, lane.pos), dir)
-    local beltPosAt = function(i) return Pos.add(lane.pos, Pos.mul(Dir.toOffset[dir], i-1)) end
+  for laneIdx,lane in pairs(laneStarts) do
+    local length = Pos.proj(Pos.sub(targetPos, lane.pos), targetDir)
+    local beltPosAt = function(i) return Pos.add(lane.pos, Pos.mul(Dir.toOffset[targetDir], i-1)) end
     local i=1
 
     while i <= length+1 do
       -- Don't worry about obstructions when doing corners - old belts are there that would count as obstructions, and
       -- we want to replace them to reorient them.
       local inCorner = (lane.cornerLength and i <= lane.cornerLength)
-      if not inCorner and isObstructed(player, beltPosAt(i), dir) then
+      if not inCorner and isObstructed(player, beltPosAt(i), targetDir) then
         if #belts > 0 and belts[#belts].proto == undergroundProto then
           return nil
         end
         belts[#belts] = {proto=undergroundProto, type=pdata.beltReverse and "output" or "input", pos=beltPosAt(i-1)}
         local j = i+1
-        while j < length+1 and (isObstructed(player, beltPosAt(j), dir) or isObstructed(player, beltPosAt(j+1), dir)) do
+        while j < length+1 and (isObstructed(player, beltPosAt(j), targetDir) or isObstructed(player, beltPosAt(j+1), targetDir)) do
           j = j + 1
         end
         if j < length+1 and j-i < undergroundProto.max_underground_distance then
@@ -148,7 +154,7 @@ function planBelts(player, beltProto, lanes, dir, targetPos)
   return {
     belts = belts,
     laneEnds = laneEnds,
-    dir = pdata.beltReverse and Dir.R[Dir.R[dir]] or dir
+    beltDir = pdata.beltReverse and Dir.R[Dir.R[targetDir]] or targetDir
   }
 end
 
@@ -177,17 +183,7 @@ end
 -- `startPos` to turn a corner.
 -- On success, returns {belts, dir} where belts is an array of {proto, type, pos} used by placeBelts.
 function findAndPlanPath(player, beltProto, startPos, targetPos)
-  local _, pdata = Player.get(player.index)
-  local lastEntity = findEntity(player, beltProto.name, startPos)
-  if not (lastEntity and lastEntity.valid) then
-    -- TODO do we need this? just place a lane from lastPlacedBelt.pos
-    -- debug(player, "couldn't find previous belt %s at %s", beltProto.name, Pos.str(startPos))
-    return {}
-  end
-
   local dir = Dir.getPrimary(startPos, targetPos)
-  local laneInfo = findParallelLanes(player)
-  local lanes = planLaneStarts(player, laneInfo.leftTop, laneInfo.count, laneInfo.dir, dir)
   return planBelts(player, beltProto, lanes, dir, targetPos)
 end
 
@@ -321,7 +317,7 @@ function drawMarkers(player, targetPos)
   destroyMarkers(player)
 
   if not pdata.lastPlacedBelt then return end  -- shouldn't happen
-  local rv = findAndPlanPath(player, pdata.lastPlacedBelt.proto, pdata.lastPlacedBelt.pos, targetPos)
+  local rv = planBelts(player, pdata.lastPlacedBelt.proto, pdata.lastPlacedBelt.pos, targetPos)
   if not rv then
     return
   end
@@ -331,7 +327,7 @@ function drawMarkers(player, targetPos)
     markers[#markers+1] = rendering.draw_sprite{
       sprite = 'quickbelt-marker',
       tint = pdata.beltReverse and kMarkerColorReverse or kMarkerColor,
-      orientation = Dir.toOrientation[rv.dir],
+      orientation = Dir.toOrientation[rv.beltDir],
       target = Pos.add(belt.pos, {x=.5, y=.5}),
       surface = player.surface,
       players = {player.index},
@@ -385,7 +381,7 @@ script.on_event(defines.events.on_built_entity, function(event)
     if proto.type ~= "transport-belt" then return end
 
     if pdata.lastPlacedBelt then
-      local rv = findAndPlanPath(player, pdata.lastPlacedBelt.proto, pdata.lastPlacedBelt.pos, pos)
+      local rv = planBelts(player, pdata.lastPlacedBelt.proto, pdata.lastPlacedBelt.pos, pos)
       -- Entity may have been paved over alredy. If not, remove it, since it's only used as a signal to the mod.
       if event.created_entity.valid then event.created_entity.destroy() end
       if not rv then
@@ -394,12 +390,12 @@ script.on_event(defines.events.on_built_entity, function(event)
       end
 
       pdata.modIsPlacing = true
-      placeBelts(player, rv.belts, rv.dir)
+      placeBelts(player, rv.belts, rv.beltDir)
       pdata.modIsPlacing = false
       proto = pdata.lastPlacedBelt.proto
       pos = rv.belts[#rv.belts].pos
       pdata.lastPlacedLane = rv.laneEnds
-      pdata.lastPlacedDir = rv.dir
+      pdata.lastPlacedDir = rv.beltDir
     end
   elseif proto.type == "transport-belt" then
     trackParallelLanes(player, event.created_entity)
