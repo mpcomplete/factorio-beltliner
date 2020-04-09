@@ -7,6 +7,12 @@ data:extend({
     linked_game_control = "rotate",
     consuming = "none"
   },
+  {
+    type = "custom-input",
+    name = "quickbelt-toggle",
+    key_sequence = "CTRL+SHIFT+B",
+    consuming = "none"
+  },
   -- An invisible entity used for detecting where the mouse cursor is.
   {
     type = "simple-entity",
