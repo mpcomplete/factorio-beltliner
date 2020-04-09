@@ -68,7 +68,7 @@ function planLaneStarts(player, leftTop, numLanes, startDir, targetDir)
     local curPos = (targetDir == Dir.E or targetDir == Dir.S) and
       leftTop or
       Pos.add(leftTop, Pos.mul(Dir.toOffset[targetDir], -(numLanes-1)))
-    
+
     if pdata.beltReverse then
       -- If we're reversing belts, then the laneStarts actually represent the end of the the lane.
       -- So we have to handle the corner in the opposite direction. startDir is reversed, and we end
