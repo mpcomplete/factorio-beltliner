@@ -4,7 +4,7 @@ data:extend({
     type = "custom-input",
     name = "quickbelt-reverse",
     key_sequence = "",
-    linked_game_control = "rotate",
+    linked_game_control = "reverse-rotate",
     consuming = "none"
   },
   {
