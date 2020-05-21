@@ -14,6 +14,15 @@ end
 script.on_configuration_changed(onInit)
 script.on_init(onInit)
 
+function bboxContains(bbox, pos)
+  return (pos.x >= bbox.left_top.x and pos.x <= bbox.right_bottom.x and
+          pos.y >= bbox.left_top.y and pos.y <= bbox.right_bottom.y)
+end
+
+function bboxCenter(bbox)
+  return Pos.mul(Pos.add(bbox.left_top, bbox.right_bottom), 0.5)
+end
+
 -- Finds an entity at the given position with the given protoName, or a ghost with that ghost_prototype.
 function findEntity(player, protoName, pos)
   local e = player.surface.find_entity(protoName, pos)
@@ -254,11 +263,6 @@ function centerDetectorsAt(player, pos)
   local kRadius = 10
   local _, pdata = Player.get(player.index)
 
-  local function bboxContains(bbox, pos)
-    return (pos.x >= bbox.left_top.x and pos.x <= bbox.right_bottom.x and
-            pos.y >= bbox.left_top.y and pos.y <= bbox.right_bottom.y)
-  end
-
   local radiusOffset = {x=kRadius, y=kRadius}
   local newBbox = {
     left_top = Pos.sub(pos, radiusOffset),
@@ -282,13 +286,18 @@ function centerDetectorsAt(player, pos)
     for y = -kRadius, kRadius do
       local cellPos = Pos.add(pos, {x=x, y=y})
       if not oldBbox or not bboxContains(oldBbox, cellPos) then
-        local entity = player.surface.create_entity{
-          name="quickbelt-cursor-detector",
-          position=cellPos,
-          direction=Dir.N,
-          force=player.force,
-          player=player
-        }
+        -- Only create a detector if there's no entity there. If there is, it can act as our detector. This
+        -- fixes a bug where entity ghosts would be deleted if the player was standing inside them.
+        local entities = player.surface.find_entities_filtered{position=cellPos}
+        if #entities == 0 then
+          local entity = player.surface.create_entity{
+            name="quickbelt-cursor-detector",
+            position=cellPos,
+            direction=Dir.N,
+            force=player.force,
+            player=player
+          }
+        end
       end
     end
   end
@@ -422,7 +431,8 @@ end)
 function updateMarkers(player)
   local _, pdata = Player.get(player.index)
   if pdata.isPlacing and player.selected then
-    local targetPos = player.selected.bounding_box.left_top
+    -- Center = avg of bbox
+    local targetPos = bboxCenter(player.selected.bounding_box)
     -- debug(player, "Cursor moved: %s", Pos.str(targetPos))
     drawMarkers(player, targetPos)
     centerDetectorsAt(player, targetPos)
