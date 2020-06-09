@@ -169,10 +169,10 @@ end
 -- Ignores existing belts facing a parallel direction.
 -- TODO: should do better about distinguishing obstacles with existing belts we can replace.
 function isObstructed(player, pos, dir)
-  if player.surface.can_place_entity{name = "transport-belt", position = pos, direction = dir} then
+  if player.surface.can_place_entity{name = "transport-belt", position = pos, direction = dir, force = player.force} then
     return false
   end
-  for _, e in pairs(player.surface.find_entities{pos, Pos.add(pos, {x=.5,y=.5})}) do
+  for _, e in pairs(player.surface.find_entities{pos, Pos.add(pos, {x=1.0,y=1.0})}) do
     local proto = e.name == "entity-ghost" and e.ghost_prototype or e.prototype
     if (proto.type == "transport-belt" or proto.type == "underground-belt") and Dir.isParallel(e.direction, dir) then
       return false
