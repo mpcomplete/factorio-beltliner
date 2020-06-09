@@ -6,7 +6,7 @@ the belts in a straight line. The mod will orient the belts in the right
 direction, use undergrounds to avoid obstacles, and handle multiple belt
 corners.
 
-![BeltLiner in action](https://i.imgur.com/97kwX1K.gifv)
+![BeltLiner in action](action.gif)
 
 # How to use
 
