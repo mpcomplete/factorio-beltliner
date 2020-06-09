@@ -275,7 +275,7 @@ function centerDetectorsAt(player, pos)
       left_top = Pos.sub(pdata.centerDetectorPos, radiusOffset),
       right_bottom = Pos.add(pdata.centerDetectorPos, radiusOffset)
     }
-    local entities = player.surface.find_entities_filtered{area=oldBbox, name="quickbelt-cursor-detector"}
+    local entities = player.surface.find_entities_filtered{area=oldBbox, name="beltliner-cursor-detector"}
     for _, e in pairs(entities) do
       if not bboxContains(newBbox, e.bounding_box.left_top) then e.destroy() end
     end
@@ -291,7 +291,7 @@ function centerDetectorsAt(player, pos)
         local entities = player.surface.find_entities_filtered{position=cellPos}
         if #entities == 0 then
           local entity = player.surface.create_entity{
-            name="quickbelt-cursor-detector",
+            name="beltliner-cursor-detector",
             position=cellPos,
             direction=Dir.N,
             force=player.force,
@@ -307,7 +307,7 @@ end
 function destroyDetectors(player)
   local _, pdata = Player.get(player.index)
   pdata.centerDetectorPos = nil
-  local entities = player.surface.find_entities_filtered{name="quickbelt-cursor-detector"}
+  local entities = player.surface.find_entities_filtered{name="beltliner-cursor-detector"}
   for _, e in pairs(entities) do
     e.destroy()
   end
@@ -331,7 +331,7 @@ function drawMarkers(player, targetPos)
   local markers = {}
   for _,belt in pairs(rv.belts) do
     markers[#markers+1] = rendering.draw_sprite{
-      sprite = 'quickbelt-marker',
+      sprite = 'beltliner-marker',
       tint = pdata.beltReverse and kMarkerColorReverse or kMarkerColor,
       orientation = Dir.toOrientation[rv.beltDir],
       target = Pos.add(belt.pos, {x=.5, y=.5}),
@@ -446,7 +446,7 @@ script.on_event(defines.events.on_selected_entity_changed, function(event)
   end
 end)
 
-script.on_event("quickbelt-reverse", function(event)
+script.on_event("beltliner-reverse", function(event)
   local player, pdata = Player.get(event.player_index)
   if pdata.isPlacing then
     pdata.beltReverse = not pdata.beltReverse
@@ -454,10 +454,10 @@ script.on_event("quickbelt-reverse", function(event)
   end
 end)
 
-script.on_event("quickbelt-toggle", function(event)
+script.on_event("beltliner-toggle", function(event)
   local player, pdata = Player.get(event.player_index)
   pdata.disabled = not pdata.disabled
-  player.print("Quickbelt placement is now " .. (pdata.disabled and "disabled" or "enabled"))
+  player.print("BeltLiner placement is now " .. (pdata.disabled and "disabled" or "enabled"))
   if pdata.disabled then 
     endPlacementMode(player)
   end

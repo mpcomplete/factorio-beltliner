@@ -1,5 +1,5 @@
 #!/bin/sh
-name=QuickBelt_1.0.0
+name=BeltLiner_1.0.0
 mkdir $name
 cp -a * $name
 rm $name/*.sh $name/*.zip $name/$name -rf

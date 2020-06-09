@@ -1,8 +1,8 @@
 {
-	"name": "QuickBelt",
+	"name": "BeltLiner",
 	"version": "1.0.0",
-	"title": "QuickBelt",
+	"title": "BeltLiner",
 	"author": "mpcomplete",
-	"description": "Place multiple lanes of belts with a single click. Handles rotations and corners, and avoids obstacles with undergrounds.",
+	"description": "Quickly and easily place multiple lanes of belts in a straight line. Handles corners and avoids obstacles with undergrounds.",
 	"factorio_version": "0.18"
 }
