@@ -222,12 +222,13 @@ end
 
 -- Place a ghost of the given belt type.
 function placeGhost(player, beltProto, pos, dir, optType)
-  local existing = player.surface.find_entities{pos, Pos.add(pos, {x=.1,y=.1})}
+  local area = {pos, Pos.add(pos, {x=.1,y=.1})};
+  local existing = player.surface.find_entities(area);
   if existing[1] and
     ((existing[1].name == beltProto.name) or
      (existing[1].name == "entity-ghost" and existing[1].ghost_prototype.name == beltProto.name)) and
      existing[1].direction ~= dir then
-    player.surface.deconstruct_area{area={pos, Pos.add(pos, {x=.1,y=.1})}, force=player.force, player=player}
+    player.surface.deconstruct_area{area=area, force=player.force, player=player}
   end
   player.surface.create_entity{
     name="entity-ghost",
